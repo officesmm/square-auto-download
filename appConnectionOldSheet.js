@@ -17,6 +17,9 @@ const CalculationDate = new Date("2023-06-15");
 var base_dir = "D:\\"
 
 const log_in = async () => {
+
+    let currentCalculationDate = f.formatDateSlash(CalculationDate);
+
     const browser = await puppeteer.launch({
         headless: false,
         args: ['--no-sandbox', '--disable-gpu', '--enable-webgl', '--window-size=1200,800', '--single-process', '--no-zygote',]
@@ -58,8 +61,10 @@ const log_in = async () => {
     await page.waitForTimeout(3000);
     await page.type('#queryNum', "100");
 
-    await page.waitForSelector('input[id="clearDate"]');
-    await page.type('input[id="clearDate"]',f.formatDateSlash(CalculationDate));
+    await page.$eval('#clearDate', (el,date) => { el.value = date; }, currentCalculationDate);
+
+    await page.waitForTimeout(1000);
+    // await page.$eval('#clearDate', el => el.setAttribute("value", "2023/06/15"));
 
     await page.evaluate(() => {
         search();
@@ -134,10 +139,8 @@ const log_in = async () => {
     await page.$eval('#agentCodeControl > option', e => e.setAttribute("value", "OA019265"));
     await page.$eval('#payType > option', e => e.setAttribute("value", "10"));
 
-    await page.waitForSelector('input[id="basicDate"]');
-    await page.type('input[id="basicDate"]',f.formatDateSlash(CalculationDate));
+    await page.$eval('#basicDate', (el,date) => { el.value = date; }, currentCalculationDate);
 
-    // await page.$eval('#basicDate', el => el.value = f.formatDateSlash(CalculationDate));
     await page.evaluate(() => {
         const checkbox = document.getElementById('isOnlyFlgControl');
         checkbox.checked = false;
@@ -190,11 +193,8 @@ const log_in = async () => {
     await page.waitForTimeout(2000);
     await page.$eval('#agentCodeControl > option', e => e.setAttribute("value", "OA011675"));
     await page.$eval('#payType > option', e => e.setAttribute("value", "10"));
+    await page.$eval('#basicDate', (el,date) => { el.value = date; }, currentCalculationDate);
 
-    await page.waitForSelector('input[id="basicDate"]');
-    await page.type('input[id="basicDate"]',f.formatDateSlash(CalculationDate));
-
-    // await page.$eval('#basicDate', el => el.value = '2023/06/15');
     await page.$eval('#branchCodeControl > option', e => e.setAttribute("value", "SQ0999999999"));
     await page.evaluate(() => {
         const checkbox = document.getElementById('isOnlyFlgControl');
