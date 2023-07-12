@@ -5,6 +5,8 @@ puppeteer.use(StealthPlugin());
 const xlsx = require('xlsx')
 const Tesseract = require('tesseract.js')
 const fs = require("fs");
+const { spawn } = require('child_process');
+
 
 const userid = "square_seisan";
 const Password = "Square123##";
@@ -33,13 +35,17 @@ const log_in = async () => {
             return text;
         })
     }
+    await page.waitForTimeout(3000);
 
     const authCode = await getUser();
     await page.type('#userAccount', userid);
+    await page.waitForTimeout(3000);
     await page.type('#password', Password);
+    await page.waitForTimeout(3000);
     await page.type('#captcha', authCode);
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(3000);
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
 
     await page.goto('https://console.onepay.finance/diffWithTradeAndActuaryManage/clearRecord', {waitUntil: 'domcontentloaded'}); // wait until page load
 
@@ -119,14 +125,12 @@ const log_in = async () => {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    const numberFormat = '#,##0';
-
-    worksheet['B8'].v = result2[0][1];
-    worksheet['C8'].v = result2[0][2];
-    worksheet['D8'].v = result2[0][3];
-    worksheet['E8'].v = result2[0][4];
-    worksheet['F8'].v = result2[0][5];
-    worksheet['G8'].v = result2[0][6];
+    worksheet['B8'].v = parseInt(result2[0][1].toString().replace(/,/g,''));
+    worksheet['C8'].v = parseInt(result2[0][2].toString().replace(/,/g,''));
+    worksheet['D8'].v = parseInt(result2[0][3].toString().replace(/,/g,''));
+    worksheet['E8'].v = parseInt(result2[0][4].toString().replace(/,/g,''));
+    worksheet['F8'].v = parseInt(result2[0][5].toString().replace(/,/g,''));
+    worksheet['G8'].v = parseInt(result2[0][6].toString().replace(/,/g,''));
 
     // get the information from unzipped
     var UnzippedFiles = fs.readdirSync('./unzippedtried/');
@@ -154,10 +158,30 @@ const log_in = async () => {
 
     await page.waitForTimeout(2000);
 
-    const calculatedValuetemp = worksheet['E75'].v;
-    console.log('E75 :', calculatedValuetemp);
-
     xlsx.writeFile(workbook, `./template/SquareTemplate.xlsx`);
+
+    // Run Python script
+    const pythonProcess = spawn('python', ['TemplateResultReader.py','null']);
+
+    // Print output from Python script
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`Python script output: ${data}`);
+    });
+
+    // Handle Python script errors
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`Python script error: ${data}`);
+    });
+    // const workbook2 = xlsx.readFile('./template/SquareTemplate.xlsx');
+    // const sheetName2 = workbook2.SheetNames[0];
+    // const worksheet2 = workbook2.Sheets[sheetName2];
+    // const calculatedValuetemp = worksheet2['E75'].v;
+    // console.log('E75 :', calculatedValuetemp);
+    // const calculatedValuetemp2 = worksheet2['E76'].v;
+    // console.log('E76 :', calculatedValuetemp2);
+    // const calculatedValuetemp3 = worksheet2['E77'].v;
+    // console.log('E77 :', calculatedValuetemp3);
+
 }
 
 log_in()
