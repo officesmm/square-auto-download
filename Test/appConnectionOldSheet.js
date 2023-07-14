@@ -7,7 +7,7 @@ const xlsx = require('xlsx')
 const Tesseract = require('tesseract.js')
 const fs = require("fs");
 const {spawn} = require('child_process');
-const f= require('./function.js')
+const f= require('../function.js')
 var path = require('path');
 
 const userid = "square_seisan";
