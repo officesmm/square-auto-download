@@ -1,21 +1,31 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const decompress = require("decompress");
 puppeteer.use(StealthPlugin());
 
+const decompress = require("decompress");
 const xlsx = require('xlsx')
 const Tesseract = require('tesseract.js')
 const fs = require("fs");
 const {spawn} = require('child_process');
 const f = require('./function.js')
 var path = require('path');
+const ChatBot = require('dingtalk-robot-sender');
+const SFTPClient = require("ssh2-sftp-client");
+const robot = new ChatBot({
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=290fc32bb41a5326ad0e44fa59ee2f7c60b58f40820a904268665656ab025f73'
+});
 
 const userid = "square_seisan";
 const Password = "Square123##";
-// const CalculationDate = '2023-06-15';
-var CalculationDate;
 var base_dir = "D:\\"
+// var base_dir = "/home/onepay/Zip/" // use this on server site
 
+const SFTPhost= "192.168.0.77";
+const SFTPport ='2836';
+const SFTPUserName= "onepay";
+const SFTPpassword= "onepay001";
+
+var CalculationDate;
 const log_in = async () => {
     // date calculation
     const today = new Date();
@@ -34,6 +44,7 @@ const log_in = async () => {
 
     const browser = await puppeteer.launch({
         headless: false,
+        // headless: true, // use this on server site
         args: ['--no-sandbox', '--disable-gpu', '--enable-webgl', '--window-size=1200,800', '--single-process', '--no-zygote',]
     });
 
@@ -117,7 +128,7 @@ const log_in = async () => {
         mailstr.lastIndexOf("&quot;);return false")
     );
     console.log(mySubString);
-    const downloadPath = path.resolve(base_dir + f.formatDate(new Date()) + "/NewDownloadLocation");
+    const downloadPath = path.resolve(base_dir + f.formatDate(new Date()) + "/Download15");
     const client = await page.target().createCDPSession()
     await client.send('Page.setDownloadBehavior', {
         behavior: 'allow',
@@ -129,12 +140,14 @@ const log_in = async () => {
         excelDownLoad(mySubString);
         console.log("Downloading Excels . . . ");
     }, mySubString);
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(10000);
     // End of download data
     // Decompress the downloaded file
     var DownloadedFilePath = fs.readdirSync(downloadPath);
-    var downloadedZipPath = downloadPath + '\\' + DownloadedFilePath;
-    var UnZippedPath = downloadPath + '\\unzipped';
+    var downloadedZipPath = downloadPath + '/' + DownloadedFilePath;
+    let fileToUpload = downloadedZipPath;    
+
+    var UnZippedPath = downloadPath + '/unzipped';
     decompress(downloadedZipPath, UnZippedPath)
         .then((files) => {
             console.log(files);
@@ -144,10 +157,15 @@ const log_in = async () => {
         });
 
     // Load the Excel file
-    const workbook = xlsx.readFile('./template/SquareTemplate.xlsx');
+    const workbook = xlsx.readFile('./template/SquareTemplate15.xlsx');
+    //     const workbook = xlsx.readFile('/home/onepay/SquareCalcu/template/SquareTemplate15.xlsx'); // use this on server site
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
+    // Day 15
+    worksheet['D1'].v = currentCalculationDate.toString();
+    worksheet['D11'].v = currentCalculationDate.toString();
+    // Day 15 will start here
     await page.goto('https://console.onepay.finance/statisticsAnalysisManage/tradeStatistics', {waitUntil: 'domcontentloaded'}); // wait until page load
     await page.waitForTimeout(2000);
     await page.$eval('#agentCodeControl > option', e => e.setAttribute("value", "OA019265"));
@@ -174,6 +192,8 @@ const log_in = async () => {
     });
 
     console.log(result001sqr)
+    worksheet['B1'].v = "前半"
+    worksheet['B11'].v = "前半"
 
     // Sqr001 Count and Yen
     let Sqr001UriageCount = parseInt(result001sqr[0][3].toString().replace(/,/g, ''));
@@ -229,7 +249,7 @@ const log_in = async () => {
     });
     console.log(result001sqrtest)
 
-    // Sqr001 Count and Yen
+    // Sqr001 Test Count and Yen
     let Sqr001TestUriageCount = parseInt(result001sqrtest[0][3].toString().replace(/,/g, ''));
     worksheet['B15'].v = Sqr001TestUriageCount;
     let Sqr001TestUriageYen = parseInt(result001sqrtest[0][4].toString().replace(/,/g, ''));
@@ -280,6 +300,10 @@ const log_in = async () => {
     worksheet['B27'].v = Sqr001Day15CombineShiharaikingakuCount;
     let Sqr001Day15CombineShiharaikingakuYen = Sqr001ShiharaikingakuYen - Sqr001TestShiharaikingakuYen;
     worksheet['C27'].v = Sqr001Day15CombineShiharaikingakuYen;
+    // Day 15 will end here
+
+    // Day 30 will start here
+    // Day 30 will end here
 
     // Compare
     let CompareUriagekensuTotalling = Sqr001Day15CombineUriageCount;
@@ -309,7 +333,7 @@ const log_in = async () => {
     }
 
     // Open Pay Pay Work Book
-    const PayPayWorkbook = xlsx.readFile(UnZippedPath + '\\' + UnzippedFiles[0] + "\\" + filename);
+    const PayPayWorkbook = xlsx.readFile(UnZippedPath + '/' + UnzippedFiles[0] + "/" + filename);
     const PayPaySheetName = PayPayWorkbook.SheetNames[0];
     const PayPayWorkSheet = PayPayWorkbook.Sheets[PayPaySheetName];
 
@@ -386,38 +410,86 @@ const log_in = async () => {
     let DifResultShiharaikingakuSalesSlip = (CompareShiharaikingakuTotalling - CompareShiharaikingakuSalesSlip);
     worksheet['D54'].v = DifResultShiharaikingakuSalesSlip;
 
-    if (TFResultUriagekensuSalesSlip && TFResultUriageSalesSlip && TFResultHenkinkensuSalesSlip && TFResultHenkinSalesSlip
+    let reportText = (CalculationDate.getMonth() + 1) + "月前半分の";
+    
+        if (TFResultUriagekensuSalesSlip && TFResultUriageSalesSlip && TFResultHenkinkensuSalesSlip && TFResultHenkinSalesSlip
         && TFResultUketorikensuSalesSlip && TFResultToriatsukaikoSalesSlip && TFResultShiharaikingakuSalesSlip) {
-        console.log("ALL True");
-    } else {
-        if (!TFResultUriagekensuSalesSlip) {
-            console.log("売上件数結果 : False");
+            reportText += "計算に問題はありません。結果は以下の通りです。\n\n";
         }
-        if (!TFResultUriageSalesSlip) {
-            console.log("売上結果 : False");
+        else{
+            reportText += "計算に問題はあります。結果は以下の通りです。\n\n";
         }
-        if (!TFResultHenkinkensuSalesSlip) {
-            console.log("返金件数結果 :  False");
-        }
-        if (!TFResultHenkinSalesSlip) {
-            console.log("返金結果 : False");
-        }
-        if (!TFResultUketorikensuSalesSlip) {
-            console.log("手数料・受取件数結果 : False");
-        }
-        if (!TFResultToriatsukaikoSalesSlip) {
-            console.log("取扱高結果 : False");
-        }
-        if (!TFResultShiharaikingakuSalesSlip) {
-            console.log("支払金額結果 : False");
-        }
-    }
+
+        reportText += "集計 - 売上件数: "+ CompareUriagekensuTotalling +"、";
+        reportText += "売上票 - 売上件数: "+ CompareUriagekensuSalesSlip +"、";
+        reportText += "差異 - 売上件数: "+ DifResultUriagekensuSalesSlip +"\n";
+
+        reportText += "集計 - 売上: "+ CompareUriageTotalling +"、";
+        reportText += "売上票 - 売上: "+ CompareUriageSalesSlip +"、";
+        reportText += "差異 - 売上: "+ DifResultUriageSalesSlip +"\n\n";
+
+        reportText += "集計 - 返金件数: "+ CompareHenkinkensuTotalling +"、";
+        reportText += "売上票 - 返金件数: "+ CompareHenkinkensuSalesSlip +"、";
+        reportText += "差異 - 返金件数: "+ DifResultHenkinkensuSalesSlip +"\n";
+
+        reportText += "集計 - 返金: "+ CompareHenkinTotalling +"、";
+        reportText += "売上票 - 返金: "+ CompareHenkinSalesSlip +"、";
+        reportText += "差異 - 返金: "+ DifResultHenkinSalesSlip +"\n\n";
+
+        reportText += "集計 - 手数料総額: "+ CompareUketorikensuTotalling +"、";
+        reportText += "売上票 - 手数料総額: "+ CompareUketorikensuSalesSlip +"、";
+        reportText += "差異 - 手数料総額: "+ DifResultUketorikensuSalesSlip +"\n\n";
+
+        reportText += "集計 - 取扱高: "+ CompareToriatsukaikoTotalling +"、";
+        reportText += "売上票 - 取扱高: "+ CompareToriatsukaikoSalesSlip +"、";
+        reportText += "差異 - 取扱高: "+ DifResultToriatsukaikoSalesSlip +"\n\n";
+
+        reportText += "集計 - 支払金額: "+ CompareShiharaikingakuTotalling +"、";
+        reportText += "売上票 - 支払金額: "+ CompareShiharaikingakuSalesSlip +"、";
+        reportText += "差異 - 支払金額: "+ DifResultShiharaikingakuSalesSlip +"\n\n";
+        
+    reportText+="ファイルは以下のSFTPパスにアップロードしました。\nSFTP 192.168.0.183\n";
+    reportText+="/home/onepay/Zip/" + f.formatDate(new Date()) +"/Download15";
+
+    robot.text("Square 計算からのレポート\n\n" + reportText);
+    console.log("Square 計算からのレポート\n\n" + reportText);
 
     await page.waitForTimeout(2000);
 
-    xlsx.writeFile(workbook, downloadPath + "\\SquareTemplate.xlsx");
+    let outputFileName = "Square"+(CalculationDate.getMonth() + 1)+"月前半精算結果確認.xlsx"
+    xlsx.writeFile(workbook, downloadPath + "/"+outputFileName);
+    // Square7月前半精算結果確認
+
+    // Upload to SFTP
+    var theZipFileName = path.basename(fileToUpload);
+
+    // let makeDirectory1 = "/OA011675/日本恒生ソフトウェア株式会社/" + f.formatDateNull(today);
+    // let makeDirectory2 = "/OA011675/日本恒生ソフトウェア株式会社/" + f.formatDateNull(today)+'/settlement/';
+    let makeDirectory1 = "/Public/SquareDownload/" + f.formatDateNull(today);
+    let makeDirectory2 = "/Public/SquareDownload/" + f.formatDateNull(today)+'/settlement/';
+
+    let fileToLocated = makeDirectory2 + theZipFileName;
+
+    console.log("File to Upload: " + fileToUpload);
+
+    const sftp = new SFTPClient()
+    await sftp.connect({
+        host: SFTPhost,
+        port: SFTPport,
+        username: SFTPUserName,
+        password: SFTPpassword
+    }).then( async () => {
+        await sftp.mkdir(makeDirectory1,false);
+        await sftp.mkdir(makeDirectory2, false);
+        console.log("uploading");
+        await sftp.put(fileToUpload, fileToLocated, false);
+        console.log("upload complete");
+    }).then((data) => {
+        console.log(data, 'data upload complete');
+    }).catch((err) => {
+        console.log(err, 'catch error');
+    });
 
 }
-
 
 log_in()
