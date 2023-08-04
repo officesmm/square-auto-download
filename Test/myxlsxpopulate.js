@@ -1,6 +1,6 @@
 const XlsxPopulate = require('xlsx-populate');
 
-const filePath = 'template/def.xlsx'; // Replace with the actual path to your file
+const filePath = 'template/default.xlsx'; // Replace with the actual path to your file
 
 XlsxPopulate.fromFileAsync(filePath)
     .then(workbook => {

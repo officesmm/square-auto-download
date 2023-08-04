@@ -20,6 +20,8 @@ const userid = "square_seisan";
 const Password = "Square123##";
 var base_dir = "D:/";
 // var base_dir = "/home/onepay/Zip/" // use this on server site
+var workBookTemplateLink = './template/SquareTemplate30.xlsx';
+// var workBookTemplateLink = '/home/onepay/SquareCalcu/template/SquareTemplate30.xlsx'; // use this on server site
 
 const SFTPhost= "192.168.0.77";
 const SFTPport ='2836';
@@ -171,8 +173,7 @@ const log_in = async () => {
         });
 
     // Load the Excel file
-    const workbook = xlsx.readFile('./template/SquareTemplate30.xlsx');
-    //     const workbook = xlsx.readFile('/home/onepay/SquareCalcu/template/SquareTemplate30.xlsx'); // use this on server site
+    const workbook = xlsx.readFile(workBookTemplateLink);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
